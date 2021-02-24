@@ -9,6 +9,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.concurrent.Callable;
 
 @Command(name = "run", mixinStandardHelpOptions = true, version = "run 0.1",
@@ -30,6 +31,7 @@ class run implements Callable<Integer> {
     @CommandLine.Option(names = {"-i", "--ignore_unused"}, description = "Don't output results for unused fields", defaultValue = "true")
     private boolean ignoreUnused;
 
+    private static String CUSTOM = "CUSTOM";
 
     public static void main(String... args) {
         int exitCode = new CommandLine(new run()).execute(args);
@@ -46,17 +48,27 @@ class run implements Callable<Integer> {
 
         Iterable<Field> fields =  jiraClient.getMetadataClient().getFields().claim();
         for (Field field : fields) {
+
+            if (!field.getFieldType().name().equals(CUSTOM)) continue; //Skip if not a custom field
+
             try {
+
                 String fieldUsageQuery = "project = " + jiraProject + " AND '" + field.getName() + "' is not EMPTY";
                 SearchResult searchResult = jiraClient.getSearchClient().searchJql(fieldUsageQuery).claim();
 
                 if (searchResult.getTotal() > 0 || !ignoreUnused) //Only log zero results if configured to do so
                 {
-                    System.out.println(field.getName() + "," + searchResult.getTotal());
+                    String queryURL = jiraServerURL + "/issues/?jql=" + URLEncoder.encode(fieldUsageQuery, "UTF-8");
+                    System.out.println(field.getName() + "," + searchResult.getTotal() + "," + queryURL);
                 }
             } catch (Exception e) {
-                //todo: be more aware of how this can fail, and make sure we're not missing fileds that are actually used.
-                //System.out.println(e.getMessage());
+                //todo: be more aware of how this can fail, and make sure we're not missing fields that are actually used.
+                /*System.out.println();
+                System.out.println();
+                System.out.println("==Field==");
+                System.out.println(field);
+                System.out.println("==ERROR MESSAGE==");
+                System.out.println(e.getMessage());*/
             }
         }
 
